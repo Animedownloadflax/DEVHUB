@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Share scripts, snippets, and repo links with the DevHub code community.">
+  <title>Code - DevHub</title>
+  <script>
+    (function () {
+      try {
+        var savedTheme = localStorage.getItem("devhub-theme");
+        var theme = savedTheme || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+        document.documentElement.dataset.theme = theme;
+      } catch (error) {}
+    }());
+  </script>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body data-page="code">
+  <header class="site-header site-shell">
+    <div class="header-inner">
+      <a class="brand" href="index.html">
+        <span class="brand-badge">D</span>
+        <span class="brand-copy">
+          <strong>DevHub</strong>
+          <span>Game dev network</span>
+        </span>
+      </a>
+      <button class="nav-toggle" type="button" data-nav-toggle aria-expanded="false" aria-controls="site-nav">Menu</button>
+      <nav class="site-nav" id="site-nav" data-open="false">
+        <a href="index.html" data-nav="home">Home</a>
+        <a href="jobs.html" data-nav="jobs">Jobs</a>
+        <a href="community.html" data-nav="community">Community</a>
+        <a href="code.html" data-nav="code">Code</a>
+        <a href="videos.html" data-nav="videos">Videos</a>
+      </nav>
+      <div class="auth-cluster">
+        <button class="btn btn-secondary theme-toggle" type="button" data-theme-toggle aria-pressed="false">Dark mode</button>
+        <span class="auth-chip" data-auth-summary>Guest mode</span>
+        <a class="btn btn-secondary" href="signin.html" data-auth-link>Sign in</a>
+        <button class="btn btn-primary" type="button" data-signout hidden>Sign out</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="site-shell page-stack">
+    <section class="page-hero">
+      <article class="hero-card">
+        <p class="eyebrow">Reusable building blocks</p>
+        <h1>Share code, snippets, and useful tools with the community.</h1>
+        <p class="lead">Publish examples, repo links, and implementation notes that other developers can browse and learn from.</p>
+        <div class="cta-row">
+          <span class="status-note" data-source="code" data-live="false">Loading code shares...</span>
+        </div>
+      </article>
+
+      <aside class="hero-card">
+        <p class="eyebrow">Share your work</p>
+        <h2>Publish a code post</h2>
+        <p class="helper-text">Add a summary and optional snippet. If you have a repo or gist, include the link too.</p>
+        <form id="code-form" class="field-grid">
+          <label>
+            Title
+            <input type="text" name="title" placeholder="Inventory Sync Manager" required>
+          </label>
+          <div class="field-grid two-up">
+            <label>
+              Language
+              <select name="language" required>
+                <option value="JavaScript">JavaScript</option>
+                <option value="TypeScript">TypeScript</option>
+                <option value="Python">Python</option>
+                <option value="C#">C#</option>
+                <option value="C++">C++</option>
+                <option value="Shader">Shader</option>
+              </select>
+            </label>
+            <label>
+              Repo or gist URL
+              <input type="url" name="repoUrl" placeholder="https://github.com/you/repo">
+            </label>
+          </div>
+          <label>
+            Summary
+            <textarea name="summary" placeholder="Explain what this solves and where it fits into a game production workflow." required></textarea>
+          </label>
+          <label>
+            Snippet
+            <textarea name="snippet" placeholder="Paste a short snippet or leave this blank if the repo link is enough."></textarea>
+          </label>
+          <div class="button-row">
+            <button class="btn btn-primary" type="submit">Publish code share</button>
+          </div>
+          <p class="form-status" data-form-message="code" aria-live="polite"></p>
+        </form>
+      </aside>
+    </section>
+
+    <section class="content-section">
+      <div class="section-header">
+        <div>
+          <p class="eyebrow">Search library</p>
+          <h2>Browse shared snippets</h2>
+        </div>
+      </div>
+      <div class="field-grid two-up">
+        <label>
+          Search code
+          <input id="code-search" type="text" placeholder="Search title, summary, or snippet text">
+        </label>
+        <label>
+          Filter by language
+          <select id="code-language-filter">
+            <option value="All">All</option>
+            <option value="JavaScript">JavaScript</option>
+            <option value="TypeScript">TypeScript</option>
+            <option value="Python">Python</option>
+            <option value="C#">C#</option>
+            <option value="C++">C++</option>
+            <option value="Shader">Shader</option>
+          </select>
+        </label>
+      </div>
+      <div class="list-grid" id="code-list"></div>
+    </section>
+
+    <p class="footer-note">DevHub <span data-year></span>. Save reusable snippets, repos, and coding ideas.</p>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="script.js"></script>
+</body>
+</html>
