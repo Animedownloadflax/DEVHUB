@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="DevHub is a responsive community hub for game developers to hire, learn, share code, and connect.">
+  <title>DevHub</title>
+  <script>
+    (function () {
+      try {
+        var savedTheme = localStorage.getItem("devhub-theme");
+        var theme = savedTheme || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+        document.documentElement.dataset.theme = theme;
+      } catch (error) {}
+    }());
+  </script>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body data-page="home">
+  <header class="site-header site-shell">
+    <div class="header-inner">
+      <a class="brand" href="index.html">
+        <span class="brand-badge">D</span>
+        <span class="brand-copy">
+          <strong>DevHub</strong>
+          <span>Game dev network</span>
+        </span>
+      </a>
+      <button class="nav-toggle" type="button" data-nav-toggle aria-expanded="false" aria-controls="site-nav">Menu</button>
+      <nav class="site-nav" id="site-nav" data-open="false">
+        <a href="index.html" data-nav="home">Home</a>
+        <a href="jobs.html" data-nav="jobs">Jobs</a>
+        <a href="community.html" data-nav="community">Community</a>
+        <a href="code.html" data-nav="code">Code</a>
+        <a href="videos.html" data-nav="videos">Videos</a>
+      </nav>
+      <div class="auth-cluster">
+        <button class="btn btn-secondary theme-toggle" type="button" data-theme-toggle aria-pressed="false">Dark mode</button>
+        <span class="auth-chip" data-auth-summary>Guest mode</span>
+        <a class="btn btn-secondary" href="signin.html" data-auth-link>Sign in</a>
+        <button class="btn btn-primary" type="button" data-signout hidden>Sign out</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="site-shell page-stack">
+    <section class="page-hero">
+      <article class="hero-card">
+        <p class="eyebrow">Welcome to DevHub</p>
+        <h1>Connect, hire, and share with other game developers.</h1>
+        <p class="lead">Browse jobs, join community conversations, post code, and save useful videos in one place.</p>
+        <div class="cta-row">
+          <a class="btn btn-primary" href="jobs.html">Explore jobs</a>
+          <a class="btn btn-secondary" href="signin.html">Sign in</a>
+        </div>
+        <div class="cta-row">
+          <span class="status-note" data-backend-status data-live="false">Checking backend status...</span>
+        </div>
+      </article>
+
+      <aside class="hero-card">
+        <p class="eyebrow">Quick Snapshot</p>
+        <h2>See what is active</h2>
+        <p class="body-copy">When live data is available the counts below update automatically. If not, the site still stays usable with demo content.</p>
+        <div class="stats-grid">
+          <div class="stat-card">
+            <strong data-stat="jobs">0</strong>
+            <span>Job listings</span>
+          </div>
+          <div class="stat-card">
+            <strong data-stat="community">0</strong>
+            <span>Community posts</span>
+          </div>
+          <div class="stat-card">
+            <strong data-stat="code">0</strong>
+            <span>Code shares</span>
+          </div>
+          <div class="stat-card">
+            <strong data-stat="videos">0</strong>
+            <span>Video links</span>
+          </div>
+        </div>
+      </aside>
+    </section>
+
+    <section class="content-section">
+      <div class="section-header">
+        <div>
+          <p class="eyebrow">Explore DevHub</p>
+          <h2>Main sections</h2>
+        </div>
+        <p class="section-copy">Choose an area to browse or add your own posts, links, and updates.</p>
+      </div>
+      <div class="card-grid">
+        <article class="feature-card">
+          <h3 class="card-title">Jobs</h3>
+          <p>Browse openings, review skills and locations, or publish a new role for your team.</p>
+          <a href="jobs.html">Open hiring board</a>
+        </article>
+        <article class="feature-card">
+          <h3 class="card-title">Community</h3>
+          <p>Join conversations, ask questions, and follow game dev topics across focused channels.</p>
+          <a href="community.html">Join the discussion</a>
+        </article>
+        <article class="feature-card">
+          <h3 class="card-title">Code</h3>
+          <p>Share snippets, repos, and reusable solutions with other developers in the community.</p>
+          <a href="code.html">Browse code shares</a>
+        </article>
+        <article class="feature-card">
+          <h3 class="card-title">Videos</h3>
+          <p>Collect tutorials, talks, reviews, and other learning resources worth revisiting.</p>
+          <a href="videos.html">View learning videos</a>
+        </article>
+      </div>
+    </section>
+
+    <p class="footer-note">DevHub <span data-year></span>. Jobs, community, code, and learning resources for game developers.</p>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="script.js"></script>
+</body>
+</html>
