@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Browse and publish game development jobs on DevHub.">
+  <title>Jobs - DevHub</title>
+  <script>
+    (function () {
+      try {
+        var savedTheme = localStorage.getItem("devhub-theme");
+        var theme = savedTheme || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+        document.documentElement.dataset.theme = theme;
+      } catch (error) {}
+    }());
+  </script>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body data-page="jobs">
+  <header class="site-header site-shell">
+    <div class="header-inner">
+      <a class="brand" href="index.html">
+        <span class="brand-badge">D</span>
+        <span class="brand-copy">
+          <strong>DevHub</strong>
+          <span>Game dev network</span>
+        </span>
+      </a>
+      <button class="nav-toggle" type="button" data-nav-toggle aria-expanded="false" aria-controls="site-nav">Menu</button>
+      <nav class="site-nav" id="site-nav" data-open="false">
+        <a href="index.html" data-nav="home">Home</a>
+        <a href="jobs.html" data-nav="jobs">Jobs</a>
+        <a href="community.html" data-nav="community">Community</a>
+        <a href="code.html" data-nav="code">Code</a>
+        <a href="videos.html" data-nav="videos">Videos</a>
+      </nav>
+      <div class="auth-cluster">
+        <button class="btn btn-secondary theme-toggle" type="button" data-theme-toggle aria-pressed="false">Dark mode</button>
+        <span class="auth-chip" data-auth-summary>Guest mode</span>
+        <a class="btn btn-secondary" href="signin.html" data-auth-link>Sign in</a>
+        <button class="btn btn-primary" type="button" data-signout hidden>Sign out</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="site-shell page-stack">
+    <section class="page-hero">
+      <article class="hero-card">
+        <p class="eyebrow">Hiring board</p>
+        <h1>Find opportunities and share open roles with the community.</h1>
+        <p class="lead">Search current openings, filter what matches your skills, and publish new listings for your studio or team.</p>
+        <div class="cta-row">
+          <span class="status-note" data-source="jobs" data-live="false">Loading job data...</span>
+        </div>
+      </article>
+
+      <aside class="hero-card">
+        <p class="eyebrow">Post a role</p>
+        <h2>Publish a job</h2>
+        <p class="helper-text">Sign in first, then add a clear title, short brief, skills, and a contact link.</p>
+        <form id="job-form" class="field-grid">
+          <label>
+            Job title
+            <input type="text" name="title" placeholder="Senior gameplay programmer" required>
+          </label>
+          <div class="field-grid two-up">
+            <label>
+              Contract type
+              <select name="contractType" required>
+                <option value="Full-time">Full-time</option>
+                <option value="Contract">Contract</option>
+                <option value="Freelance">Freelance</option>
+                <option value="Part-time">Part-time</option>
+              </select>
+            </label>
+            <label>
+              Location
+              <input type="text" name="location" placeholder="Remote / Mumbai" required>
+            </label>
+          </div>
+          <label>
+            Skills
+            <input type="text" name="skills" placeholder="Unity, C#, mobile gameplay" required>
+          </label>
+          <label>
+            Contact URL
+            <input type="url" name="contactUrl" placeholder="mailto:hiring@studio.com" required>
+          </label>
+          <label>
+            Summary
+            <textarea name="summary" placeholder="What will this person own, and what kind of team are they joining?" required></textarea>
+          </label>
+          <div class="button-row">
+            <button class="btn btn-primary" type="submit">Publish job</button>
+          </div>
+          <p class="form-status" data-form-message="jobs" aria-live="polite"></p>
+        </form>
+      </aside>
+    </section>
+
+    <section class="content-section">
+      <div class="section-header">
+        <div>
+          <p class="eyebrow">Open roles</p>
+          <h2>Browse current listings</h2>
+        </div>
+      </div>
+      <div class="field-grid">
+        <label>
+          Search jobs
+          <input id="job-search" type="text" placeholder="Search by title, location, or skill">
+        </label>
+      </div>
+      <div class="list-grid" id="jobs-list"></div>
+    </section>
+
+    <p class="footer-note">DevHub <span data-year></span>. Discover roles and connect with game development teams.</p>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="script.js"></script>
+</body>
+</html>
