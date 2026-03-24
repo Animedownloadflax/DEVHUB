@@ -1,5 +1,13 @@
-const SUPABASE_URL = "https://enevdpzxbsxmgfhpktcf.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVuZXZkcHp4YnN4bWdmaHBrdGNmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc4MzYwMTEsImV4cCI6MjA2MzQxMjAxMX0.tYQry8w57EhGzp2I4GKYtfYoAOAiLspRy4yDXv3x8oY";
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyB9H8Fl5pFujYzpZjpw91cqRvDMXQGJZFo",
+  authDomain: "dev-hub-b3b3c.firebaseapp.com",
+  projectId: "dev-hub-b3b3c",
+  storageBucket: "dev-hub-b3b3c.firebasestorage.app",
+  messagingSenderId: "1057908673403",
+  appId: "1:1057908673403:web:c28b78e2e31b934d638bde",
+  measurementId: "G-F474TYYVTM"
+};
+
 const CHANNELS = ["all", "general", "game-engine-help", "3d-graphics", "programming"];
 const THEME_STORAGE_KEY = "devhub-theme";
 
@@ -25,9 +33,30 @@ const STORAGE_KEYS = {
   videos: "devhub.videos"
 };
 
-const supabaseClient = window.supabase && typeof window.supabase.createClient === "function"
-  ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+function initFirebaseApp() {
+  if (!window.firebase || typeof window.firebase.initializeApp !== "function") {
+    return null;
+  }
+
+  try {
+    if (Array.isArray(window.firebase.apps) && window.firebase.apps.length) {
+      return window.firebase.app();
+    }
+
+    return window.firebase.initializeApp(FIREBASE_CONFIG);
+  } catch (error) {
+    return null;
+  }
+}
+
+const firebaseApp = initFirebaseApp();
+const firebaseAuth = firebaseApp && typeof window.firebase.auth === "function"
+  ? window.firebase.auth()
   : null;
+const firestoreDb = firebaseApp && typeof window.firebase.firestore === "function"
+  ? window.firebase.firestore()
+  : null;
+const firebaseFieldValue = window.firebase?.firestore?.FieldValue || null;
 
 function getStoredTheme() {
   try {
@@ -289,6 +318,30 @@ function safeUrl(value) {
   return "";
 }
 
+function normalizeDateValue(value) {
+  if (!value) {
+    return new Date().toISOString();
+  }
+
+  if (typeof value === "string") {
+    return value;
+  }
+
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+
+  if (typeof value.toDate === "function") {
+    return value.toDate().toISOString();
+  }
+
+  if (typeof value.seconds === "number") {
+    return new Date(value.seconds * 1000).toISOString();
+  }
+
+  return new Date().toISOString();
+}
+
 function formatRelativeTime(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
@@ -318,7 +371,7 @@ function formatRelativeTime(value) {
 
 function formatViews(value) {
   return new Intl.NumberFormat("en-US", {
-    notation: value >= 1000 ? "compact" : "standard",
+    notation: Number(value || 0) >= 1000 ? "compact" : "standard",
     maximumFractionDigits: 1
   }).format(Number(value || 0));
 }
@@ -346,6 +399,25 @@ function normalizeTags(value) {
 
 function sanitizeChannel(value) {
   return CHANNELS.includes(value) ? value : "general";
+}
+
+function createFirebaseSession(user) {
+  if (!user) {
+    return null;
+  }
+
+  return {
+    backend: "firebase",
+    access_token: user.uid,
+    user: {
+      id: user.uid,
+      email: user.email || "",
+      user_metadata: {
+        username: user.displayName || user.email?.split("@")[0] || "DevHub member",
+        full_name: user.displayName || user.email?.split("@")[0] || "DevHub member"
+      }
+    }
+  };
 }
 
 function getDisplayName(session) {
@@ -380,188 +452,15 @@ function setMessage(element, text, kind) {
   }
 }
 
-function setLiveBadge(kind, mode, text) {
+function setLiveBadge(kind, isLive, text) {
   const target = document.querySelector(`[data-source="${kind}"]`);
   if (!target) {
     return;
   }
 
-  target.dataset.live = String(mode === "supabase");
+  target.dataset.live = String(Boolean(isLive));
   target.textContent = text;
 }
-
-async function getSession() {
-  if (supabaseClient) {
-    try {
-      const { data, error } = await supabaseClient.auth.getSession();
-      if (error) {
-        throw error;
-      }
-
-      if (data.session) {
-        data.session.backend = "supabase";
-        return data.session;
-      }
-    } catch (error) {
-      if (!shouldFallbackToLocal(error)) {
-        return null;
-      }
-    }
-  }
-
-  return getLocalSession();
-}
-
-function updateAuthUi() {
-  const summary = getDisplayName(state.session);
-  document.querySelectorAll("[data-auth-summary]").forEach((element) => {
-    element.textContent = summary;
-  });
-
-  document.querySelectorAll("[data-auth-link]").forEach((element) => {
-    element.textContent = state.session ? "Account" : "Sign in";
-  });
-
-  document.querySelectorAll("[data-signout]").forEach((element) => {
-    element.hidden = !state.session;
-  });
-
-  const authEmail = document.querySelector("[data-auth-email]");
-  if (authEmail) {
-    authEmail.textContent = state.session?.user?.email || "No active session";
-  }
-
-  const authForm = document.querySelector("#auth-form");
-  const signedInPanel = document.querySelector("[data-auth-landing]");
-  if (authForm && signedInPanel) {
-    authForm.hidden = Boolean(state.session);
-    signedInPanel.hidden = !state.session;
-  }
-}
-
-function initNav() {
-  const nav = document.querySelector("#site-nav");
-  const toggle = document.querySelector("[data-nav-toggle]");
-  const page = document.body.dataset.page;
-
-  document.querySelectorAll("[data-nav]").forEach((link) => {
-    const isActive = link.dataset.nav === page;
-    link.classList.toggle("active", isActive);
-    if (isActive) {
-      link.setAttribute("aria-current", "page");
-    }
-  });
-
-  if (!nav || !toggle) {
-    return;
-  }
-
-  toggle.addEventListener("click", () => {
-    const isOpen = nav.dataset.open === "true";
-    nav.dataset.open = isOpen ? "false" : "true";
-    toggle.setAttribute("aria-expanded", String(!isOpen));
-  });
-
-  nav.querySelectorAll("a").forEach((link) => {
-    link.addEventListener("click", () => {
-      nav.dataset.open = "false";
-      toggle.setAttribute("aria-expanded", "false");
-    });
-  });
-}
-
-function bindGlobalActions() {
-  document.querySelectorAll("[data-signout]").forEach((button) => {
-    button.addEventListener("click", async () => {
-      if (state.session?.backend === "local" || !supabaseClient) {
-        await signOutLocal();
-      } else {
-        await supabaseClient.auth.signOut();
-      }
-
-      state.session = null;
-      updateAuthUi();
-
-      if (document.body.dataset.page === "signin") {
-        setMessage(document.querySelector("[data-auth-message]"), "Signed out successfully.", "success");
-      }
-    });
-  });
-}
-
-function normalizeJob(record) {
-  return {
-    id: record.id,
-    title: record.title || "Untitled role",
-    summary: record.summary || "No summary added yet.",
-    contract_type: record.contract_type || "Contract",
-    location: record.location || "Remote",
-    skills: normalizeTags(record.skills),
-    contact_url: record.contact_url || "",
-    author_name: record.author_name || "DevHub member",
-    created_at: record.created_at || new Date().toISOString()
-  };
-}
-
-function normalizeCommunity(record) {
-  return {
-    id: record.id,
-    channel: sanitizeChannel(record.channel),
-    body: record.body || "",
-    author_name: record.author_name || "DevHub member",
-    created_at: record.created_at || new Date().toISOString()
-  };
-}
-
-function normalizeCode(record) {
-  return {
-    id: record.id,
-    title: record.title || "Untitled share",
-    summary: record.summary || "No summary added yet.",
-    language: record.language || "General",
-    repo_url: record.repo_url || "",
-    snippet: record.snippet || "",
-    author_name: record.author_name || "DevHub member",
-    created_at: record.created_at || new Date().toISOString()
-  };
-}
-
-function normalizeVideo(record) {
-  return {
-    id: record.id,
-    title: record.title || "Untitled video",
-    description: record.description || "No description added yet.",
-    category: record.category || "Tutorial",
-    video_url: record.video_url || "",
-    thumbnail_url: record.thumbnail_url || "",
-    views: record.views || 0,
-    author_name: record.author_name || "DevHub member",
-    created_at: record.created_at || new Date().toISOString()
-  };
-}
-
-const collectionConfig = {
-  jobs: {
-    table: "job_posts",
-    seed: seedData.jobs,
-    normalize: normalizeJob
-  },
-  community: {
-    table: "community_posts",
-    seed: seedData.community,
-    normalize: normalizeCommunity
-  },
-  code: {
-    table: "code_posts",
-    seed: seedData.code,
-    normalize: normalizeCode
-  },
-  videos: {
-    table: "video_posts",
-    seed: seedData.videos,
-    normalize: normalizeVideo
-  }
-};
 
 function getLocalUsers() {
   return readStorage(STORAGE_KEYS.users, []);
@@ -648,63 +547,312 @@ async function signOutLocal() {
   removeStorage(STORAGE_KEYS.session);
 }
 
+function clearLocalFallbackSession() {
+  removeStorage(STORAGE_KEYS.session);
+}
+
 function shouldFallbackToLocal(error) {
+  const code = String(error?.code || "").toLowerCase();
   const message = String(error?.message || "").toLowerCase();
   return (
-    !supabaseClient
-    || message.includes("failed to fetch")
+    !firebaseAuth
+    || !firestoreDb
+    || code === "permission-denied"
+    || code === "failed-precondition"
+    || code === "unavailable"
+    || code === "unimplemented"
+    || code === "not-found"
+    || code === "auth/app-not-authorized"
+    || code === "auth/configuration-not-found"
+    || code === "auth/operation-not-allowed"
+    || code === "auth/network-request-failed"
+    || code === "auth/invalid-api-key"
+    || code === "auth/unauthorized-domain"
+    || code === "auth/web-storage-unsupported"
+    || message.includes("offline")
     || message.includes("network")
-    || message.includes("unauthorized")
-    || message.includes("forbidden")
-    || message.includes("permission denied")
-    || message.includes("invalid api key")
-    || message.includes("jwt")
-    || message.includes("relation")
-    || message.includes("does not exist")
+    || message.includes("failed to fetch")
+    || message.includes("missing or insufficient permissions")
+    || message.includes("firestore")
     || message.includes("not available")
-    || message.includes("load failed")
+    || message.includes("app has not been created")
   );
+}
+
+async function ensureFirebaseProfile(user, isNewUser) {
+  if (!firestoreDb || !user) {
+    return;
+  }
+
+  const username = user.displayName || user.email?.split("@")[0] || "DevHub member";
+  const profilePayload = {
+    email: user.email || "",
+    username,
+    updated_at: firebaseFieldValue?.serverTimestamp ? firebaseFieldValue.serverTimestamp() : new Date().toISOString()
+  };
+
+  if (isNewUser) {
+    profilePayload.created_at = firebaseFieldValue?.serverTimestamp ? firebaseFieldValue.serverTimestamp() : new Date().toISOString();
+  }
+
+  await firestoreDb.collection("profiles").doc(user.uid).set(profilePayload, { merge: true });
 }
 
 function buildCollectionStatus(kind, mode) {
   const labels = {
     jobs: {
-      supabase: "Live Supabase job data",
-      local: "Local persisted job backend active"
+      firebase: "Live Firebase job data",
+      local: "Local job fallback is active"
     },
     community: {
-      supabase: "Live Supabase community feed",
-      local: "Local persisted community backend active"
+      firebase: "Live Firebase community feed",
+      local: "Local community fallback is active"
     },
     code: {
-      supabase: "Live Supabase code shares",
-      local: "Local persisted code backend active"
+      firebase: "Live Firebase code shares",
+      local: "Local code fallback is active"
     },
     videos: {
-      supabase: "Live Supabase videos",
-      local: "Local persisted video backend active"
+      firebase: "Live Firebase videos",
+      local: "Local video fallback is active"
     }
   };
 
   return labels[kind]?.[mode] || "Backend status updated";
 }
 
+function normalizeJob(record) {
+  return {
+    id: record.id,
+    title: record.title || "Untitled role",
+    summary: record.summary || "No summary added yet.",
+    contract_type: record.contract_type || "Contract",
+    location: record.location || "Remote",
+    skills: normalizeTags(record.skills),
+    contact_url: record.contact_url || "",
+    author_name: record.author_name || "DevHub member",
+    created_at: normalizeDateValue(record.created_at)
+  };
+}
+
+function normalizeCommunity(record) {
+  return {
+    id: record.id,
+    channel: sanitizeChannel(record.channel),
+    body: record.body || "",
+    author_name: record.author_name || "DevHub member",
+    created_at: normalizeDateValue(record.created_at)
+  };
+}
+
+function normalizeCode(record) {
+  return {
+    id: record.id,
+    title: record.title || "Untitled share",
+    summary: record.summary || "No summary added yet.",
+    language: record.language || "General",
+    repo_url: record.repo_url || "",
+    snippet: record.snippet || "",
+    author_name: record.author_name || "DevHub member",
+    created_at: normalizeDateValue(record.created_at)
+  };
+}
+
+function normalizeVideo(record) {
+  return {
+    id: record.id,
+    title: record.title || "Untitled video",
+    description: record.description || "No description added yet.",
+    category: record.category || "Tutorial",
+    video_url: record.video_url || "",
+    thumbnail_url: record.thumbnail_url || "",
+    views: record.views || 0,
+    author_name: record.author_name || "DevHub member",
+    created_at: normalizeDateValue(record.created_at)
+  };
+}
+
+const collectionConfig = {
+  jobs: {
+    collection: "job_posts",
+    seed: seedData.jobs,
+    normalize: normalizeJob
+  },
+  community: {
+    collection: "community_posts",
+    seed: seedData.community,
+    normalize: normalizeCommunity
+  },
+  code: {
+    collection: "code_posts",
+    seed: seedData.code,
+    normalize: normalizeCode
+  },
+  videos: {
+    collection: "video_posts",
+    seed: seedData.videos,
+    normalize: normalizeVideo
+  }
+};
+
+async function getFirebaseSession() {
+  if (!firebaseAuth) {
+    return null;
+  }
+
+  if (firebaseAuth.currentUser) {
+    return createFirebaseSession(firebaseAuth.currentUser);
+  }
+
+  return new Promise((resolve) => {
+    let settled = false;
+    const unsubscribe = firebaseAuth.onAuthStateChanged((user) => {
+      if (settled) {
+        return;
+      }
+
+      settled = true;
+      unsubscribe();
+      resolve(user ? createFirebaseSession(user) : null);
+    }, () => {
+      if (settled) {
+        return;
+      }
+
+      settled = true;
+      resolve(null);
+    });
+
+    window.setTimeout(() => {
+      if (settled) {
+        return;
+      }
+
+      settled = true;
+      unsubscribe();
+      resolve(null);
+    }, 1500);
+  });
+}
+
+async function getSession() {
+  try {
+    const firebaseSession = await getFirebaseSession();
+    if (firebaseSession) {
+      clearLocalFallbackSession();
+      return firebaseSession;
+    }
+  } catch (error) {
+    if (!shouldFallbackToLocal(error)) {
+      return null;
+    }
+  }
+
+  return getLocalSession();
+}
+
+function updateAuthUi() {
+  const summary = getDisplayName(state.session);
+  document.querySelectorAll("[data-auth-summary]").forEach((element) => {
+    element.textContent = summary;
+  });
+
+  document.querySelectorAll("[data-auth-link]").forEach((element) => {
+    element.textContent = state.session ? "Account" : "Sign in";
+  });
+
+  document.querySelectorAll("[data-signout]").forEach((element) => {
+    element.hidden = !state.session;
+  });
+
+  const authEmail = document.querySelector("[data-auth-email]");
+  if (authEmail) {
+    authEmail.textContent = state.session?.user?.email || "No active session";
+  }
+
+  const authForm = document.querySelector("#auth-form");
+  const signedInPanel = document.querySelector("[data-auth-landing]");
+  if (authForm && signedInPanel) {
+    authForm.hidden = Boolean(state.session);
+    signedInPanel.hidden = !state.session;
+  }
+}
+
+function initNav() {
+  const nav = document.querySelector("#site-nav");
+  const toggle = document.querySelector("[data-nav-toggle]");
+  const page = document.body.dataset.page;
+
+  document.querySelectorAll("[data-nav]").forEach((link) => {
+    const isActive = link.dataset.nav === page;
+    link.classList.toggle("active", isActive);
+    if (isActive) {
+      link.setAttribute("aria-current", "page");
+    }
+  });
+
+  if (!nav || !toggle) {
+    return;
+  }
+
+  toggle.addEventListener("click", () => {
+    const isOpen = nav.dataset.open === "true";
+    nav.dataset.open = isOpen ? "false" : "true";
+    toggle.setAttribute("aria-expanded", String(!isOpen));
+  });
+
+  nav.querySelectorAll("a").forEach((link) => {
+    link.addEventListener("click", () => {
+      nav.dataset.open = "false";
+      toggle.setAttribute("aria-expanded", "false");
+    });
+  });
+}
+
+function bindGlobalActions() {
+  document.querySelectorAll("[data-signout]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      try {
+        if (state.session?.backend === "local" || !firebaseAuth) {
+          await signOutLocal();
+          state.session = null;
+          updateAuthUi();
+        } else {
+          clearLocalFallbackSession();
+          await firebaseAuth.signOut();
+        }
+
+        if (document.body.dataset.page === "signin") {
+          setMessage(document.querySelector("[data-auth-message]"), "Signed out successfully.", "success");
+        }
+      } catch (error) {
+        if (document.body.dataset.page === "signin") {
+          setMessage(document.querySelector("[data-auth-message]"), error?.message || "Unable to sign out right now.", "error");
+        }
+      }
+    });
+  });
+}
+
 async function insertRecord(kind, payload) {
   const config = collectionConfig[kind];
 
-  if (supabaseClient && state.session?.backend !== "local") {
+  if (firestoreDb && state.session?.backend !== "local") {
     try {
-      const { data, error } = await supabaseClient
-        .from(config.table)
-        .insert(payload)
-        .select("*")
-        .single();
-
-      if (error) {
-        throw error;
-      }
-
-      return { record: config.normalize(data), mode: "supabase" };
+      const collectionRef = firestoreDb.collection(config.collection);
+      const documentPayload = {
+        ...payload,
+        created_at: firebaseFieldValue?.serverTimestamp ? firebaseFieldValue.serverTimestamp() : new Date().toISOString()
+      };
+      const docRef = await collectionRef.add(documentPayload);
+      const snapshot = await docRef.get();
+      return {
+        record: config.normalize({
+          id: snapshot.id,
+          ...snapshot.data()
+        }),
+        mode: "firebase"
+      };
     } catch (error) {
       if (!shouldFallbackToLocal(error)) {
         throw error;
@@ -729,27 +877,26 @@ async function fetchCollection(kind) {
     return { items: [], mode: "local", error: "Unknown collection." };
   }
 
-  if (supabaseClient) {
+  if (firestoreDb) {
     try {
-      const { data, error } = await supabaseClient
-        .from(config.table)
-        .select("*")
-        .order("created_at", { ascending: false });
-
-      if (error) {
-        throw error;
-      }
+      const snapshot = await firestoreDb
+        .collection(config.collection)
+        .orderBy("created_at", "desc")
+        .get();
 
       return {
-        items: (data || []).map(config.normalize),
-        mode: "supabase",
+        items: snapshot.docs.map((doc) => config.normalize({
+          id: doc.id,
+          ...doc.data()
+        })),
+        mode: "firebase",
         error: ""
       };
     } catch (error) {
       if (!shouldFallbackToLocal(error)) {
         return {
           items: [],
-          mode: "supabase",
+          mode: "firebase",
           error: error?.message || "Unable to load live data."
         };
       }
@@ -937,15 +1084,24 @@ async function initHomePage() {
     }
   });
 
-  const supabaseCount = results.filter((result) => result.mode === "supabase").length;
   const status = document.querySelector("[data-backend-status]");
-  if (status) {
-    const allLive = supabaseCount === kinds.length;
-    status.dataset.live = String(allLive);
-    status.textContent = allLive
-      ? "Supabase is connected across the main content areas."
-      : "Local persisted backend is active. Supabase can replace it when the remote schema is ready.";
+  if (!status) {
+    return;
   }
+
+  const liveCount = results.filter((result) => result.mode === "firebase" && !result.error).length;
+  status.dataset.live = String(liveCount === kinds.length);
+  if (liveCount === kinds.length) {
+    status.textContent = "Firebase is connected across the main content areas.";
+    return;
+  }
+
+  if (liveCount > 0) {
+    status.textContent = "Firebase is connected for some sections. Local fallback is covering the rest until setup is finished.";
+    return;
+  }
+
+  status.textContent = "Local persisted backend is active. Firebase will take over once Auth and Firestore are enabled.";
 }
 
 async function initJobsPage() {
@@ -978,8 +1134,8 @@ async function initJobsPage() {
       state.datasets.jobs.unshift(result.record);
       renderJobs();
       form.reset();
-      setLiveBadge("jobs", result.mode, buildCollectionStatus("jobs", result.mode));
-      setMessage(message, result.mode === "supabase" ? "Job published successfully." : "Job saved to the local backend.", "success");
+      setLiveBadge("jobs", result.mode === "firebase", buildCollectionStatus("jobs", result.mode));
+      setMessage(message, result.mode === "firebase" ? "Job published to Firebase." : "Job saved to the local fallback backend.", "success");
     } catch (error) {
       setMessage(message, error?.message || "Unable to publish job.", "error");
     }
@@ -987,7 +1143,7 @@ async function initJobsPage() {
 
   const result = await fetchCollection("jobs");
   state.datasets.jobs = result.items;
-  setLiveBadge("jobs", result.mode, buildCollectionStatus("jobs", result.mode));
+  setLiveBadge("jobs", result.mode === "firebase" && !result.error, result.error || buildCollectionStatus("jobs", result.mode));
   renderJobs();
 }
 
@@ -1023,8 +1179,8 @@ async function initCommunityPage() {
       state.datasets.community.unshift(result.record);
       renderCommunity();
       form.reset();
-      setLiveBadge("community", result.mode, buildCollectionStatus("community", result.mode));
-      setMessage(message, result.mode === "supabase" ? "Post published successfully." : "Post saved to the local backend.", "success");
+      setLiveBadge("community", result.mode === "firebase", buildCollectionStatus("community", result.mode));
+      setMessage(message, result.mode === "firebase" ? "Post published to Firebase." : "Post saved to the local fallback backend.", "success");
     } catch (error) {
       setMessage(message, error?.message || "Unable to publish post.", "error");
     }
@@ -1032,7 +1188,7 @@ async function initCommunityPage() {
 
   const result = await fetchCollection("community");
   state.datasets.community = result.items;
-  setLiveBadge("community", result.mode, buildCollectionStatus("community", result.mode));
+  setLiveBadge("community", result.mode === "firebase" && !result.error, result.error || buildCollectionStatus("community", result.mode));
   renderCommunity();
 }
 
@@ -1066,8 +1222,8 @@ async function initCodePage() {
       state.datasets.code.unshift(result.record);
       renderCode();
       form.reset();
-      setLiveBadge("code", result.mode, buildCollectionStatus("code", result.mode));
-      setMessage(message, result.mode === "supabase" ? "Code share published successfully." : "Code share saved to the local backend.", "success");
+      setLiveBadge("code", result.mode === "firebase", buildCollectionStatus("code", result.mode));
+      setMessage(message, result.mode === "firebase" ? "Code share published to Firebase." : "Code share saved to the local fallback backend.", "success");
     } catch (error) {
       setMessage(message, error?.message || "Unable to publish code share.", "error");
     }
@@ -1075,7 +1231,7 @@ async function initCodePage() {
 
   const result = await fetchCollection("code");
   state.datasets.code = result.items;
-  setLiveBadge("code", result.mode, buildCollectionStatus("code", result.mode));
+  setLiveBadge("code", result.mode === "firebase" && !result.error, result.error || buildCollectionStatus("code", result.mode));
   renderCode();
 }
 
@@ -1110,8 +1266,8 @@ async function initVideosPage() {
       state.datasets.videos.unshift(result.record);
       renderVideos();
       form.reset();
-      setLiveBadge("videos", result.mode, buildCollectionStatus("videos", result.mode));
-      setMessage(message, result.mode === "supabase" ? "Video link published successfully." : "Video link saved to the local backend.", "success");
+      setLiveBadge("videos", result.mode === "firebase", buildCollectionStatus("videos", result.mode));
+      setMessage(message, result.mode === "firebase" ? "Video link published to Firebase." : "Video link saved to the local fallback backend.", "success");
     } catch (error) {
       setMessage(message, error?.message || "Unable to publish video link.", "error");
     }
@@ -1119,7 +1275,7 @@ async function initVideosPage() {
 
   const result = await fetchCollection("videos");
   state.datasets.videos = result.items;
-  setLiveBadge("videos", result.mode, buildCollectionStatus("videos", result.mode));
+  setLiveBadge("videos", result.mode === "firebase" && !result.error, result.error || buildCollectionStatus("videos", result.mode));
   renderVideos();
 }
 
@@ -1140,25 +1296,24 @@ async function initSigninPage() {
 
     try {
       if (intent === "signup") {
-        if (supabaseClient) {
+        if (firebaseAuth) {
           try {
-            const { data, error } = await supabaseClient.auth.signUp({ email, password });
-            if (error) {
-              throw error;
+            const credential = await firebaseAuth.createUserWithEmailAndPassword(email, password);
+            const user = credential.user;
+            if (user && !user.displayName) {
+              await user.updateProfile({
+                displayName: user.email?.split("@")[0] || "DevHub member"
+              });
             }
 
-            if (data.session) {
-              data.session.backend = "supabase";
-              setMessage(message, "Account created and signed in. Redirecting home...", "success");
-              state.session = data.session;
-              updateAuthUi();
-              setTimeout(() => {
-                window.location.href = "index.html";
-              }, 700);
-              return;
-            }
-
-            setMessage(message, "Account created. Check your email if confirmations are enabled.", "success");
+            clearLocalFallbackSession();
+            await ensureFirebaseProfile(firebaseAuth.currentUser || user, true);
+            state.session = createFirebaseSession(firebaseAuth.currentUser || user);
+            updateAuthUi();
+            setMessage(message, "Account created and connected to Firebase. Redirecting home...", "success");
+            setTimeout(() => {
+              window.location.href = "index.html";
+            }, 700);
             return;
           } catch (error) {
             if (!shouldFallbackToLocal(error)) {
@@ -1170,26 +1325,21 @@ async function initSigninPage() {
         const localSignup = await signUpLocal(email, password);
         state.session = localSignup.session;
         updateAuthUi();
-        setMessage(message, "Local account created and signed in. Redirecting home...", "success");
+        setMessage(message, "Firebase is not ready yet, so a local account was created instead. Redirecting home...", "success");
         setTimeout(() => {
           window.location.href = "index.html";
         }, 700);
         return;
       }
 
-      if (supabaseClient) {
+      if (firebaseAuth) {
         try {
-          const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
-          if (error) {
-            throw error;
-          }
-
-          state.session = data.session || null;
-          if (state.session) {
-            state.session.backend = "supabase";
-          }
+          const credential = await firebaseAuth.signInWithEmailAndPassword(email, password);
+          clearLocalFallbackSession();
+          await ensureFirebaseProfile(firebaseAuth.currentUser || credential.user, false);
+          state.session = createFirebaseSession(firebaseAuth.currentUser || credential.user);
           updateAuthUi();
-          setMessage(message, "Signed in successfully. Redirecting home...", "success");
+          setMessage(message, "Signed in with Firebase. Redirecting home...", "success");
           setTimeout(() => {
             window.location.href = "index.html";
           }, 700);
@@ -1204,7 +1354,7 @@ async function initSigninPage() {
       const localSignin = await signInLocal(email, password);
       state.session = localSignin.session;
       updateAuthUi();
-      setMessage(message, "Signed in with the local backend. Redirecting home...", "success");
+      setMessage(message, "Signed in with the local fallback backend. Redirecting home...", "success");
       setTimeout(() => {
         window.location.href = "index.html";
       }, 700);
@@ -1226,13 +1376,19 @@ async function initApp() {
   initNav();
   bindGlobalActions();
 
-  if (supabaseClient) {
-    supabaseClient.auth.onAuthStateChange((_event, session) => {
-      if (session) {
-        session.backend = "supabase";
+  if (firebaseAuth) {
+    firebaseAuth.onAuthStateChanged((user) => {
+      if (user) {
+        clearLocalFallbackSession();
+        state.session = createFirebaseSession(user);
+        updateAuthUi();
+        return;
       }
-      state.session = session || (state.session?.backend === "local" ? state.session : null);
-      updateAuthUi();
+
+      if (state.session?.backend === "firebase") {
+        state.session = null;
+        updateAuthUi();
+      }
     });
   }
 
