@@ -1,11 +1,11 @@
 const FIREBASE_CONFIG = {
-  apiKey: "AIzaSyB9H8Fl5pFujYzpZjpw91cqRvDMXQGJZFo",
-  authDomain: "dev-hub-b3b3c.firebaseapp.com",
-  projectId: "dev-hub-b3b3c",
-  storageBucket: "dev-hub-b3b3c.firebasestorage.app",
-  messagingSenderId: "1057908673403",
-  appId: "1:1057908673403:web:c28b78e2e31b934d638bde",
-  measurementId: "G-F474TYYVTM"
+  apiKey: "AIzaSyAjqYjDaf7XvvfSGGMtYX_M9vZAew0-vKs",
+  authDomain: "dev-hub-cb39a.firebaseapp.com",
+  projectId: "dev-hub-cb39a",
+  storageBucket: "dev-hub-cb39a.firebasestorage.app",
+  messagingSenderId: "759664187136",
+  appId: "1:759664187136:web:3032b17277e60c818545e5",
+  measurementId: "G-F2F03BEX3L"
 };
 
 const CHANNELS = ["all", "general", "game-engine-help", "3d-graphics", "programming"];
