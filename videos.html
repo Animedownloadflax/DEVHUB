@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Browse and publish game development tutorials, talks, and reviews on DevHub.">
+  <title>Videos - DevHub</title>
+  <script>
+    (function () {
+      try {
+        var savedTheme = localStorage.getItem("devhub-theme");
+        var theme = savedTheme || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+        document.documentElement.dataset.theme = theme;
+      } catch (error) {}
+    }());
+  </script>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body data-page="videos">
+  <header class="site-header site-shell">
+    <div class="header-inner">
+      <a class="brand" href="index.html">
+        <span class="brand-badge">D</span>
+        <span class="brand-copy">
+          <strong>DevHub</strong>
+          <span>Game dev network</span>
+        </span>
+      </a>
+      <button class="nav-toggle" type="button" data-nav-toggle aria-expanded="false" aria-controls="site-nav">Menu</button>
+      <nav class="site-nav" id="site-nav" data-open="false">
+        <a href="index.html" data-nav="home">Home</a>
+        <a href="jobs.html" data-nav="jobs">Jobs</a>
+        <a href="community.html" data-nav="community">Community</a>
+        <a href="code.html" data-nav="code">Code</a>
+        <a href="videos.html" data-nav="videos">Videos</a>
+      </nav>
+      <div class="auth-cluster">
+        <button class="btn btn-secondary theme-toggle" type="button" data-theme-toggle aria-pressed="false">Dark mode</button>
+        <span class="auth-chip" data-auth-summary>Guest mode</span>
+        <a class="btn btn-secondary" href="signin.html" data-auth-link>Sign in</a>
+        <button class="btn btn-primary" type="button" data-signout hidden>Sign out</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="site-shell page-stack">
+    <section class="page-hero">
+      <article class="hero-card">
+        <p class="eyebrow">Learning library</p>
+        <h1>Collect tutorials, talks, and reviews worth sharing.</h1>
+        <p class="lead">Browse learning resources, search by topic, and save helpful video links for the rest of the community.</p>
+        <div class="cta-row">
+          <span class="status-note" data-source="videos" data-live="false">Loading video library...</span>
+        </div>
+      </article>
+
+      <aside class="hero-card">
+        <p class="eyebrow">Share a learning link</p>
+        <h2>Publish a video card</h2>
+        <p class="helper-text">Add the title, link, category, and an optional thumbnail so others can find useful learning content quickly.</p>
+        <form id="video-form" class="field-grid">
+          <label>
+            Title
+            <input type="text" name="title" placeholder="Lighting breakdown for stylized levels" required>
+          </label>
+          <div class="field-grid two-up">
+            <label>
+              Category
+              <select name="category" required>
+                <option value="Tutorial">Tutorial</option>
+                <option value="Talk">Talk</option>
+                <option value="Review">Review</option>
+                <option value="Course">Course</option>
+              </select>
+            </label>
+            <label>
+              Video URL
+              <input type="url" name="videoUrl" placeholder="https://youtube.com/watch?v=..." required>
+            </label>
+          </div>
+          <label>
+            Thumbnail URL
+            <input type="url" name="thumbnailUrl" placeholder="Optional image URL">
+          </label>
+          <label>
+            Description
+            <textarea name="description" placeholder="Explain why this video is worth watching and who it helps." required></textarea>
+          </label>
+          <div class="button-row">
+            <button class="btn btn-primary" type="submit">Publish video link</button>
+          </div>
+          <p class="form-status" data-form-message="videos" aria-live="polite"></p>
+        </form>
+      </aside>
+    </section>
+
+    <section class="content-section">
+      <div class="section-header">
+        <div>
+          <p class="eyebrow">Search library</p>
+          <h2>Browse videos</h2>
+        </div>
+      </div>
+      <div class="field-grid two-up">
+        <label>
+          Search videos
+          <input id="video-search" type="text" placeholder="Search titles and descriptions">
+        </label>
+        <label>
+          Filter by category
+          <select id="video-category-filter">
+            <option value="All">All</option>
+            <option value="Tutorial">Tutorial</option>
+            <option value="Talk">Talk</option>
+            <option value="Review">Review</option>
+            <option value="Course">Course</option>
+          </select>
+        </label>
+      </div>
+      <div class="video-grid" id="video-list"></div>
+    </section>
+
+    <p class="footer-note">DevHub <span data-year></span>. Tutorials, talks, reviews, and other learning resources.</p>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="script.js"></script>
+</body>
+</html>

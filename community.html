@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Join the DevHub community channels for game engine help, graphics, and programming discussions.">
+  <title>Community - DevHub</title>
+  <script>
+    (function () {
+      try {
+        var savedTheme = localStorage.getItem("devhub-theme");
+        var theme = savedTheme || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+        document.documentElement.dataset.theme = theme;
+      } catch (error) {}
+    }());
+  </script>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body data-page="community">
+  <header class="site-header site-shell">
+    <div class="header-inner">
+      <a class="brand" href="index.html">
+        <span class="brand-badge">D</span>
+        <span class="brand-copy">
+          <strong>DevHub</strong>
+          <span>Game dev network</span>
+        </span>
+      </a>
+      <button class="nav-toggle" type="button" data-nav-toggle aria-expanded="false" aria-controls="site-nav">Menu</button>
+      <nav class="site-nav" id="site-nav" data-open="false">
+        <a href="index.html" data-nav="home">Home</a>
+        <a href="jobs.html" data-nav="jobs">Jobs</a>
+        <a href="community.html" data-nav="community">Community</a>
+        <a href="code.html" data-nav="code">Code</a>
+        <a href="videos.html" data-nav="videos">Videos</a>
+      </nav>
+      <div class="auth-cluster">
+        <button class="btn btn-secondary theme-toggle" type="button" data-theme-toggle aria-pressed="false">Dark mode</button>
+        <span class="auth-chip" data-auth-summary>Guest mode</span>
+        <a class="btn btn-secondary" href="signin.html" data-auth-link>Sign in</a>
+        <button class="btn btn-primary" type="button" data-signout hidden>Sign out</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="site-shell page-stack">
+    <section class="page-hero">
+      <article class="hero-card">
+        <p class="eyebrow">Community spaces</p>
+        <h1>Join focused conversations with other game developers.</h1>
+        <p class="lead">Follow specialist channels, ask for help, share progress, and keep up with the wider DevHub community.</p>
+      </article>
+
+      <aside class="hero-card">
+        <p class="eyebrow">Start a conversation</p>
+        <h2>Post to the feed</h2>
+        <p class="helper-text">Use your signed-in identity or add a friendly display name for your message.</p>
+        <form id="community-form" class="field-grid">
+          <div class="field-grid two-up">
+            <label>
+              Channel
+              <select name="channel" required>
+                <option value="general">general</option>
+                <option value="game-engine-help">game-engine-help</option>
+                <option value="3d-graphics">3d-graphics</option>
+                <option value="programming">programming</option>
+              </select>
+            </label>
+            <label>
+              Display name
+              <input type="text" name="authorName" placeholder="Optional">
+            </label>
+          </div>
+          <label>
+            Message
+            <textarea name="body" placeholder="Share progress, ask a question, or help another developer." required></textarea>
+          </label>
+          <div class="button-row">
+            <button class="btn btn-primary" type="submit">Publish post</button>
+          </div>
+          <p class="form-status" data-form-message="community" aria-live="polite"></p>
+        </form>
+      </aside>
+    </section>
+
+    <section class="channel-layout">
+      <aside class="channel-panel">
+        <p class="eyebrow">Channels</p>
+        <h2>Browse topics</h2>
+        <p class="helper-text">Choose a topic to filter the feed and jump into the conversations that matter most to you.</p>
+        <div class="channel-list">
+          <button class="channel-button active" type="button" data-channel="all">All channels</button>
+          <button class="channel-button" type="button" data-channel="general"># general</button>
+          <button class="channel-button" type="button" data-channel="game-engine-help"># game-engine-help</button>
+          <button class="channel-button" type="button" data-channel="3d-graphics"># 3d-graphics</button>
+          <button class="channel-button" type="button" data-channel="programming"># programming</button>
+        </div>
+        <div class="cta-row">
+          <span class="status-note" data-source="community" data-live="false">Loading community feed...</span>
+        </div>
+      </aside>
+
+      <section class="channel-panel">
+        <div class="section-header">
+          <div>
+            <p class="eyebrow">Live feed</p>
+            <h2>Recent posts</h2>
+          </div>
+        </div>
+        <div class="timeline" id="community-feed"></div>
+      </section>
+    </section>
+
+    <p class="footer-note">DevHub <span data-year></span>. Talk engines, graphics, programming, and game production.</p>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="script.js"></script>
+</body>
+</html>
