@@ -452,6 +452,39 @@ function setMessage(element, text, kind) {
   }
 }
 
+function getFriendlyAuthMessage(error, intent) {
+  const code = String(error?.code || "").toLowerCase();
+
+  if (code === "auth/email-already-in-use") {
+    return "That email already has an account. Tap Sign in instead.";
+  }
+
+  if (code === "auth/weak-password") {
+    return "Use a password with at least 6 characters.";
+  }
+
+  if (code === "auth/too-many-requests") {
+    return "Too many tries right now. Wait a moment and try again.";
+  }
+
+  if (code === "auth/network-request-failed") {
+    return "Network problem. Check your internet and try again.";
+  }
+
+  if (
+    code === "auth/invalid-credential"
+    || code === "auth/invalid-login-credentials"
+    || code === "auth/user-not-found"
+    || code === "auth/wrong-password"
+  ) {
+    return intent === "signin"
+      ? "This email or password does not match an online account yet. If this is the first time, tap Create account."
+      : "That account could not be created. Try a different email or password.";
+  }
+
+  return error?.message || "Unable to authenticate right now.";
+}
+
 function setLiveBadge(kind, isLive, text) {
   const target = document.querySelector(`[data-source="${kind}"]`);
   if (!target) {
@@ -1359,7 +1392,7 @@ async function initSigninPage() {
         window.location.href = "index.html";
       }, 700);
     } catch (error) {
-      setMessage(message, error?.message || "Unable to authenticate right now.", "error");
+      setMessage(message, getFriendlyAuthMessage(error, intent), "error");
     }
   });
 }
