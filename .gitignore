@@ -1,3 +1,5 @@
 firebase.exe
 firepit-log.txt
 .firebase/
+.vscode/
+.github/workflows-dotgit-backup/

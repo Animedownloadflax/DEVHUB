@@ -1,5 +1,13 @@
-const SUPABASE_URL = "https://enevdpzxbsxmgfhpktcf.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVuZXZkcHp4YnN4bWdmaHBrdGNmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc4MzYwMTEsImV4cCI6MjA2MzQxMjAxMX0.tYQry8w57EhGzp2I4GKYtfYoAOAiLspRy4yDXv3x8oY";
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyAjqYjDaf7XvvfSGGMtYX_M9vZAew0-vKs",
+  authDomain: "dev-hub-cb39a.firebaseapp.com",
+  projectId: "dev-hub-cb39a",
+  storageBucket: "dev-hub-cb39a.firebasestorage.app",
+  messagingSenderId: "759664187136",
+  appId: "1:759664187136:web:3032b17277e60c818545e5",
+  measurementId: "G-F2F03BEX3L"
+};
+
 const CHANNELS = ["all", "general", "game-engine-help", "3d-graphics", "programming"];
 const THEME_STORAGE_KEY = "devhub-theme";
 
@@ -16,9 +24,39 @@ const state = {
   }
 };
 
-const supabaseClient = window.supabase && typeof window.supabase.createClient === "function"
-  ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+const STORAGE_KEYS = {
+  users: "devhub.users",
+  session: "devhub.session",
+  jobs: "devhub.jobs",
+  community: "devhub.community",
+  code: "devhub.code",
+  videos: "devhub.videos"
+};
+
+function initFirebaseApp() {
+  if (!window.firebase || typeof window.firebase.initializeApp !== "function") {
+    return null;
+  }
+
+  try {
+    if (Array.isArray(window.firebase.apps) && window.firebase.apps.length) {
+      return window.firebase.app();
+    }
+
+    return window.firebase.initializeApp(FIREBASE_CONFIG);
+  } catch (error) {
+    return null;
+  }
+}
+
+const firebaseApp = initFirebaseApp();
+const firebaseAuth = firebaseApp && typeof window.firebase.auth === "function"
+  ? window.firebase.auth()
   : null;
+const firestoreDb = firebaseApp && typeof window.firebase.firestore === "function"
+  ? window.firebase.firestore()
+  : null;
+const firebaseFieldValue = window.firebase?.firestore?.FieldValue || null;
 
 function getStoredTheme() {
   try {
@@ -208,6 +246,52 @@ const seedData = {
   ]
 };
 
+function canUseLocalStorage() {
+  try {
+    const probeKey = "__devhub_probe__";
+    window.localStorage.setItem(probeKey, "1");
+    window.localStorage.removeItem(probeKey);
+    return true;
+  } catch (error) {
+    return false;
+  }
+}
+
+const hasLocalStorage = typeof window !== "undefined" && canUseLocalStorage();
+
+function readStorage(key, fallbackValue) {
+  if (!hasLocalStorage) {
+    return fallbackValue;
+  }
+
+  try {
+    const rawValue = window.localStorage.getItem(key);
+    return rawValue ? JSON.parse(rawValue) : fallbackValue;
+  } catch (error) {
+    return fallbackValue;
+  }
+}
+
+function writeStorage(key, value) {
+  if (!hasLocalStorage) {
+    return;
+  }
+
+  window.localStorage.setItem(key, JSON.stringify(value));
+}
+
+function removeStorage(key) {
+  if (!hasLocalStorage) {
+    return;
+  }
+
+  window.localStorage.removeItem(key);
+}
+
+function createLocalId(prefix) {
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
 function escapeHtml(value) {
   return String(value ?? "")
     .replaceAll("&", "&amp;")
@@ -232,6 +316,30 @@ function safeUrl(value) {
   }
 
   return "";
+}
+
+function normalizeDateValue(value) {
+  if (!value) {
+    return new Date().toISOString();
+  }
+
+  if (typeof value === "string") {
+    return value;
+  }
+
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+
+  if (typeof value.toDate === "function") {
+    return value.toDate().toISOString();
+  }
+
+  if (typeof value.seconds === "number") {
+    return new Date(value.seconds * 1000).toISOString();
+  }
+
+  return new Date().toISOString();
 }
 
 function formatRelativeTime(value) {
@@ -263,7 +371,7 @@ function formatRelativeTime(value) {
 
 function formatViews(value) {
   return new Intl.NumberFormat("en-US", {
-    notation: value >= 1000 ? "compact" : "standard",
+    notation: Number(value || 0) >= 1000 ? "compact" : "standard",
     maximumFractionDigits: 1
   }).format(Number(value || 0));
 }
@@ -291,6 +399,25 @@ function normalizeTags(value) {
 
 function sanitizeChannel(value) {
   return CHANNELS.includes(value) ? value : "general";
+}
+
+function createFirebaseSession(user) {
+  if (!user) {
+    return null;
+  }
+
+  return {
+    backend: "firebase",
+    access_token: user.uid,
+    user: {
+      id: user.uid,
+      email: user.email || "",
+      user_metadata: {
+        username: user.displayName || user.email?.split("@")[0] || "DevHub member",
+        full_name: user.displayName || user.email?.split("@")[0] || "DevHub member"
+      }
+    }
+  };
 }
 
 function getDisplayName(session) {
@@ -325,30 +452,303 @@ function setMessage(element, text, kind) {
   }
 }
 
-function setLiveBadge(kind, live, text) {
+function setLiveBadge(kind, isLive, text) {
   const target = document.querySelector(`[data-source="${kind}"]`);
   if (!target) {
     return;
   }
 
-  target.dataset.live = String(Boolean(live));
+  target.dataset.live = String(Boolean(isLive));
   target.textContent = text;
 }
 
-async function getSession() {
-  if (!supabaseClient) {
+function getLocalUsers() {
+  return readStorage(STORAGE_KEYS.users, []);
+}
+
+function saveLocalUsers(users) {
+  writeStorage(STORAGE_KEYS.users, users);
+}
+
+function createSessionFromUser(user) {
+  return {
+    backend: "local",
+    access_token: "local-session",
+    user: {
+      id: user.id,
+      email: user.email,
+      user_metadata: user.user_metadata || {}
+    }
+  };
+}
+
+function getLocalSession() {
+  return readStorage(STORAGE_KEYS.session, null);
+}
+
+function saveLocalSession(session) {
+  writeStorage(STORAGE_KEYS.session, session);
+}
+
+function getLocalCollection(kind) {
+  const existing = readStorage(STORAGE_KEYS[kind], null);
+  if (Array.isArray(existing)) {
+    return existing;
+  }
+
+  const seededItems = collectionConfig[kind].seed.map((item) => ({ ...item }));
+  writeStorage(STORAGE_KEYS[kind], seededItems);
+  return seededItems;
+}
+
+function saveLocalCollection(kind, items) {
+  writeStorage(STORAGE_KEYS[kind], items);
+}
+
+async function signUpLocal(email, password) {
+  const normalizedEmail = String(email || "").trim().toLowerCase();
+  const users = getLocalUsers();
+
+  if (users.some((user) => user.email === normalizedEmail)) {
+    throw new Error("An account with this email already exists in the local backend.");
+  }
+
+  const user = {
+    id: createLocalId("user"),
+    email: normalizedEmail,
+    password,
+    user_metadata: {
+      username: normalizedEmail.split("@")[0]
+    }
+  };
+
+  users.push(user);
+  saveLocalUsers(users);
+
+  const session = createSessionFromUser(user);
+  saveLocalSession(session);
+  return { session, mode: "local" };
+}
+
+async function signInLocal(email, password) {
+  const normalizedEmail = String(email || "").trim().toLowerCase();
+  const user = getLocalUsers().find((item) => item.email === normalizedEmail);
+
+  if (!user || user.password !== password) {
+    throw new Error("Invalid email or password for the local backend.");
+  }
+
+  const session = createSessionFromUser(user);
+  saveLocalSession(session);
+  return { session, mode: "local" };
+}
+
+async function signOutLocal() {
+  removeStorage(STORAGE_KEYS.session);
+}
+
+function clearLocalFallbackSession() {
+  removeStorage(STORAGE_KEYS.session);
+}
+
+function shouldFallbackToLocal(error) {
+  const code = String(error?.code || "").toLowerCase();
+  const message = String(error?.message || "").toLowerCase();
+  return (
+    !firebaseAuth
+    || !firestoreDb
+    || code === "permission-denied"
+    || code === "failed-precondition"
+    || code === "unavailable"
+    || code === "unimplemented"
+    || code === "not-found"
+    || code === "auth/app-not-authorized"
+    || code === "auth/configuration-not-found"
+    || code === "auth/operation-not-allowed"
+    || code === "auth/network-request-failed"
+    || code === "auth/invalid-api-key"
+    || code === "auth/unauthorized-domain"
+    || code === "auth/web-storage-unsupported"
+    || message.includes("offline")
+    || message.includes("network")
+    || message.includes("failed to fetch")
+    || message.includes("missing or insufficient permissions")
+    || message.includes("firestore")
+    || message.includes("not available")
+    || message.includes("app has not been created")
+  );
+}
+
+async function ensureFirebaseProfile(user, isNewUser) {
+  if (!firestoreDb || !user) {
+    return;
+  }
+
+  const username = user.displayName || user.email?.split("@")[0] || "DevHub member";
+  const profilePayload = {
+    email: user.email || "",
+    username,
+    updated_at: firebaseFieldValue?.serverTimestamp ? firebaseFieldValue.serverTimestamp() : new Date().toISOString()
+  };
+
+  if (isNewUser) {
+    profilePayload.created_at = firebaseFieldValue?.serverTimestamp ? firebaseFieldValue.serverTimestamp() : new Date().toISOString();
+  }
+
+  await firestoreDb.collection("profiles").doc(user.uid).set(profilePayload, { merge: true });
+}
+
+function buildCollectionStatus(kind, mode) {
+  const labels = {
+    jobs: {
+      firebase: "Live Firebase job data",
+      local: "Local job fallback is active"
+    },
+    community: {
+      firebase: "Live Firebase community feed",
+      local: "Local community fallback is active"
+    },
+    code: {
+      firebase: "Live Firebase code shares",
+      local: "Local code fallback is active"
+    },
+    videos: {
+      firebase: "Live Firebase videos",
+      local: "Local video fallback is active"
+    }
+  };
+
+  return labels[kind]?.[mode] || "Backend status updated";
+}
+
+function normalizeJob(record) {
+  return {
+    id: record.id,
+    title: record.title || "Untitled role",
+    summary: record.summary || "No summary added yet.",
+    contract_type: record.contract_type || "Contract",
+    location: record.location || "Remote",
+    skills: normalizeTags(record.skills),
+    contact_url: record.contact_url || "",
+    author_name: record.author_name || "DevHub member",
+    created_at: normalizeDateValue(record.created_at)
+  };
+}
+
+function normalizeCommunity(record) {
+  return {
+    id: record.id,
+    channel: sanitizeChannel(record.channel),
+    body: record.body || "",
+    author_name: record.author_name || "DevHub member",
+    created_at: normalizeDateValue(record.created_at)
+  };
+}
+
+function normalizeCode(record) {
+  return {
+    id: record.id,
+    title: record.title || "Untitled share",
+    summary: record.summary || "No summary added yet.",
+    language: record.language || "General",
+    repo_url: record.repo_url || "",
+    snippet: record.snippet || "",
+    author_name: record.author_name || "DevHub member",
+    created_at: normalizeDateValue(record.created_at)
+  };
+}
+
+function normalizeVideo(record) {
+  return {
+    id: record.id,
+    title: record.title || "Untitled video",
+    description: record.description || "No description added yet.",
+    category: record.category || "Tutorial",
+    video_url: record.video_url || "",
+    thumbnail_url: record.thumbnail_url || "",
+    views: record.views || 0,
+    author_name: record.author_name || "DevHub member",
+    created_at: normalizeDateValue(record.created_at)
+  };
+}
+
+const collectionConfig = {
+  jobs: {
+    collection: "job_posts",
+    seed: seedData.jobs,
+    normalize: normalizeJob
+  },
+  community: {
+    collection: "community_posts",
+    seed: seedData.community,
+    normalize: normalizeCommunity
+  },
+  code: {
+    collection: "code_posts",
+    seed: seedData.code,
+    normalize: normalizeCode
+  },
+  videos: {
+    collection: "video_posts",
+    seed: seedData.videos,
+    normalize: normalizeVideo
+  }
+};
+
+async function getFirebaseSession() {
+  if (!firebaseAuth) {
     return null;
   }
 
-  try {
-    const { data, error } = await supabaseClient.auth.getSession();
-    if (error) {
-      throw error;
-    }
-    return data.session || null;
-  } catch (error) {
-    return null;
+  if (firebaseAuth.currentUser) {
+    return createFirebaseSession(firebaseAuth.currentUser);
   }
+
+  return new Promise((resolve) => {
+    let settled = false;
+    const unsubscribe = firebaseAuth.onAuthStateChanged((user) => {
+      if (settled) {
+        return;
+      }
+
+      settled = true;
+      unsubscribe();
+      resolve(user ? createFirebaseSession(user) : null);
+    }, () => {
+      if (settled) {
+        return;
+      }
+
+      settled = true;
+      resolve(null);
+    });
+
+    window.setTimeout(() => {
+      if (settled) {
+        return;
+      }
+
+      settled = true;
+      unsubscribe();
+      resolve(null);
+    }, 1500);
+  });
+}
+
+async function getSession() {
+  try {
+    const firebaseSession = await getFirebaseSession();
+    if (firebaseSession) {
+      clearLocalFallbackSession();
+      return firebaseSession;
+    }
+  } catch (error) {
+    if (!shouldFallbackToLocal(error)) {
+      return null;
+    }
+  }
+
+  return getLocalSession();
 }
 
 function updateAuthUi() {
@@ -412,127 +812,102 @@ function initNav() {
 function bindGlobalActions() {
   document.querySelectorAll("[data-signout]").forEach((button) => {
     button.addEventListener("click", async () => {
-      if (!supabaseClient) {
-        return;
-      }
+      try {
+        if (state.session?.backend === "local" || !firebaseAuth) {
+          await signOutLocal();
+          state.session = null;
+          updateAuthUi();
+        } else {
+          clearLocalFallbackSession();
+          await firebaseAuth.signOut();
+        }
 
-      await supabaseClient.auth.signOut();
-      state.session = null;
-      updateAuthUi();
-
-      if (document.body.dataset.page === "signin") {
-        setMessage(document.querySelector("[data-auth-message]"), "Signed out successfully.", "success");
+        if (document.body.dataset.page === "signin") {
+          setMessage(document.querySelector("[data-auth-message]"), "Signed out successfully.", "success");
+        }
+      } catch (error) {
+        if (document.body.dataset.page === "signin") {
+          setMessage(document.querySelector("[data-auth-message]"), error?.message || "Unable to sign out right now.", "error");
+        }
       }
     });
   });
 }
 
-function normalizeJob(record) {
-  return {
-    id: record.id,
-    title: record.title || "Untitled role",
-    summary: record.summary || "No summary added yet.",
-    contract_type: record.contract_type || "Contract",
-    location: record.location || "Remote",
-    skills: normalizeTags(record.skills),
-    contact_url: record.contact_url || "",
-    author_name: record.author_name || "DevHub member",
-    created_at: record.created_at || new Date().toISOString()
-  };
-}
+async function insertRecord(kind, payload) {
+  const config = collectionConfig[kind];
 
-function normalizeCommunity(record) {
-  return {
-    id: record.id,
-    channel: sanitizeChannel(record.channel),
-    body: record.body || "",
-    author_name: record.author_name || "DevHub member",
-    created_at: record.created_at || new Date().toISOString()
-  };
-}
-
-function normalizeCode(record) {
-  return {
-    id: record.id,
-    title: record.title || "Untitled share",
-    summary: record.summary || "No summary added yet.",
-    language: record.language || "General",
-    repo_url: record.repo_url || "",
-    snippet: record.snippet || "",
-    author_name: record.author_name || "DevHub member",
-    created_at: record.created_at || new Date().toISOString()
-  };
-}
-
-function normalizeVideo(record) {
-  return {
-    id: record.id,
-    title: record.title || "Untitled video",
-    description: record.description || "No description added yet.",
-    category: record.category || "Tutorial",
-    video_url: record.video_url || "",
-    thumbnail_url: record.thumbnail_url || "",
-    views: record.views || 0,
-    author_name: record.author_name || "DevHub member",
-    created_at: record.created_at || new Date().toISOString()
-  };
-}
-
-const collectionConfig = {
-  jobs: {
-    table: "job_posts",
-    seed: seedData.jobs,
-    normalize: normalizeJob
-  },
-  community: {
-    table: "community_posts",
-    seed: seedData.community,
-    normalize: normalizeCommunity
-  },
-  code: {
-    table: "code_posts",
-    seed: seedData.code,
-    normalize: normalizeCode
-  },
-  videos: {
-    table: "video_posts",
-    seed: seedData.videos,
-    normalize: normalizeVideo
+  if (firestoreDb && state.session?.backend !== "local") {
+    try {
+      const collectionRef = firestoreDb.collection(config.collection);
+      const documentPayload = {
+        ...payload,
+        created_at: firebaseFieldValue?.serverTimestamp ? firebaseFieldValue.serverTimestamp() : new Date().toISOString()
+      };
+      const docRef = await collectionRef.add(documentPayload);
+      const snapshot = await docRef.get();
+      return {
+        record: config.normalize({
+          id: snapshot.id,
+          ...snapshot.data()
+        }),
+        mode: "firebase"
+      };
+    } catch (error) {
+      if (!shouldFallbackToLocal(error)) {
+        throw error;
+      }
+    }
   }
-};
+
+  const items = getLocalCollection(kind);
+  const record = config.normalize({
+    id: createLocalId(kind),
+    ...payload,
+    created_at: new Date().toISOString()
+  });
+  items.unshift(record);
+  saveLocalCollection(kind, items);
+  return { record, mode: "local" };
+}
 
 async function fetchCollection(kind) {
   const config = collectionConfig[kind];
   if (!config) {
-    return { items: [], live: false, error: "Unknown collection." };
+    return { items: [], mode: "local", error: "Unknown collection." };
   }
 
-  if (!supabaseClient) {
-    return { items: config.seed.map(config.normalize), live: false, error: "Supabase client not available." };
-  }
+  if (firestoreDb) {
+    try {
+      const snapshot = await firestoreDb
+        .collection(config.collection)
+        .orderBy("created_at", "desc")
+        .get();
 
-  try {
-    const { data, error } = await supabaseClient
-      .from(config.table)
-      .select("*")
-      .order("created_at", { ascending: false });
-
-    if (error) {
-      throw error;
+      return {
+        items: snapshot.docs.map((doc) => config.normalize({
+          id: doc.id,
+          ...doc.data()
+        })),
+        mode: "firebase",
+        error: ""
+      };
+    } catch (error) {
+      if (!shouldFallbackToLocal(error)) {
+        return {
+          items: [],
+          mode: "firebase",
+          error: error?.message || "Unable to load live data."
+        };
+      }
     }
-
-    return {
-      items: (data || []).map(config.normalize),
-      live: true,
-      error: ""
-    };
-  } catch (error) {
-    return {
-      items: config.seed.map(config.normalize),
-      live: false,
-      error: error?.message || "Unable to load live data."
-    };
   }
+
+  return {
+    items: getLocalCollection(kind).map(config.normalize),
+    mode: "local",
+    error: ""
+  };
 }
 
 function renderEmptyState(title, message) {
@@ -709,15 +1084,24 @@ async function initHomePage() {
     }
   });
 
-  const liveCount = results.filter((result) => result.live).length;
   const status = document.querySelector("[data-backend-status]");
-  if (status) {
-    const allLive = liveCount === kinds.length;
-    status.dataset.live = String(allLive);
-    status.textContent = allLive
-      ? "Supabase is connected across the main content areas."
-      : "Showing demo content until you run backend/supabase-schema.sql in Supabase.";
+  if (!status) {
+    return;
   }
+
+  const liveCount = results.filter((result) => result.mode === "firebase" && !result.error).length;
+  status.dataset.live = String(liveCount === kinds.length);
+  if (liveCount === kinds.length) {
+    status.textContent = "Firebase is connected across the main content areas.";
+    return;
+  }
+
+  if (liveCount > 0) {
+    status.textContent = "Firebase is connected for some sections. Local fallback is covering the rest until setup is finished.";
+    return;
+  }
+
+  status.textContent = "Local persisted backend is active. Firebase will take over once Auth and Firestore are enabled.";
 }
 
 async function initJobsPage() {
@@ -729,11 +1113,6 @@ async function initJobsPage() {
     const message = document.querySelector('[data-form-message="jobs"]');
     if (!state.session) {
       setMessage(message, "Sign in before publishing a job.", "error");
-      return;
-    }
-
-    if (!supabaseClient) {
-      setMessage(message, "Supabase is unavailable in this browser session.", "error");
       return;
     }
 
@@ -751,20 +1130,12 @@ async function initJobsPage() {
     };
 
     try {
-      const { data, error } = await supabaseClient
-        .from("job_posts")
-        .insert(payload)
-        .select("*")
-        .single();
-
-      if (error) {
-        throw error;
-      }
-
-      state.datasets.jobs.unshift(normalizeJob(data));
+      const result = await insertRecord("jobs", payload);
+      state.datasets.jobs.unshift(result.record);
       renderJobs();
       form.reset();
-      setMessage(message, "Job published successfully.", "success");
+      setLiveBadge("jobs", result.mode === "firebase", buildCollectionStatus("jobs", result.mode));
+      setMessage(message, result.mode === "firebase" ? "Job published to Firebase." : "Job saved to the local fallback backend.", "success");
     } catch (error) {
       setMessage(message, error?.message || "Unable to publish job.", "error");
     }
@@ -772,7 +1143,7 @@ async function initJobsPage() {
 
   const result = await fetchCollection("jobs");
   state.datasets.jobs = result.items;
-  setLiveBadge("jobs", result.live, result.live ? "Live Supabase job data" : "Demo jobs shown until the backend schema is applied");
+  setLiveBadge("jobs", result.mode === "firebase" && !result.error, result.error || buildCollectionStatus("jobs", result.mode));
   renderJobs();
 }
 
@@ -794,11 +1165,6 @@ async function initCommunityPage() {
       return;
     }
 
-    if (!supabaseClient) {
-      setMessage(message, "Supabase is unavailable in this browser session.", "error");
-      return;
-    }
-
     const form = event.currentTarget;
     const formData = new FormData(form);
     const payload = {
@@ -809,20 +1175,12 @@ async function initCommunityPage() {
     };
 
     try {
-      const { data, error } = await supabaseClient
-        .from("community_posts")
-        .insert(payload)
-        .select("*")
-        .single();
-
-      if (error) {
-        throw error;
-      }
-
-      state.datasets.community.unshift(normalizeCommunity(data));
+      const result = await insertRecord("community", payload);
+      state.datasets.community.unshift(result.record);
       renderCommunity();
       form.reset();
-      setMessage(message, "Post published successfully.", "success");
+      setLiveBadge("community", result.mode === "firebase", buildCollectionStatus("community", result.mode));
+      setMessage(message, result.mode === "firebase" ? "Post published to Firebase." : "Post saved to the local fallback backend.", "success");
     } catch (error) {
       setMessage(message, error?.message || "Unable to publish post.", "error");
     }
@@ -830,7 +1188,7 @@ async function initCommunityPage() {
 
   const result = await fetchCollection("community");
   state.datasets.community = result.items;
-  setLiveBadge("community", result.live, result.live ? "Live Supabase community feed" : "Demo community posts shown until the backend schema is applied");
+  setLiveBadge("community", result.mode === "firebase" && !result.error, result.error || buildCollectionStatus("community", result.mode));
   renderCommunity();
 }
 
@@ -847,11 +1205,6 @@ async function initCodePage() {
       return;
     }
 
-    if (!supabaseClient) {
-      setMessage(message, "Supabase is unavailable in this browser session.", "error");
-      return;
-    }
-
     const form = event.currentTarget;
     const formData = new FormData(form);
     const payload = {
@@ -865,20 +1218,12 @@ async function initCodePage() {
     };
 
     try {
-      const { data, error } = await supabaseClient
-        .from("code_posts")
-        .insert(payload)
-        .select("*")
-        .single();
-
-      if (error) {
-        throw error;
-      }
-
-      state.datasets.code.unshift(normalizeCode(data));
+      const result = await insertRecord("code", payload);
+      state.datasets.code.unshift(result.record);
       renderCode();
       form.reset();
-      setMessage(message, "Code share published successfully.", "success");
+      setLiveBadge("code", result.mode === "firebase", buildCollectionStatus("code", result.mode));
+      setMessage(message, result.mode === "firebase" ? "Code share published to Firebase." : "Code share saved to the local fallback backend.", "success");
     } catch (error) {
       setMessage(message, error?.message || "Unable to publish code share.", "error");
     }
@@ -886,7 +1231,7 @@ async function initCodePage() {
 
   const result = await fetchCollection("code");
   state.datasets.code = result.items;
-  setLiveBadge("code", result.live, result.live ? "Live Supabase code shares" : "Demo code shares shown until the backend schema is applied");
+  setLiveBadge("code", result.mode === "firebase" && !result.error, result.error || buildCollectionStatus("code", result.mode));
   renderCode();
 }
 
@@ -900,11 +1245,6 @@ async function initVideosPage() {
     const message = document.querySelector('[data-form-message="videos"]');
     if (!state.session) {
       setMessage(message, "Sign in before publishing a video link.", "error");
-      return;
-    }
-
-    if (!supabaseClient) {
-      setMessage(message, "Supabase is unavailable in this browser session.", "error");
       return;
     }
 
@@ -922,20 +1262,12 @@ async function initVideosPage() {
     };
 
     try {
-      const { data, error } = await supabaseClient
-        .from("video_posts")
-        .insert(payload)
-        .select("*")
-        .single();
-
-      if (error) {
-        throw error;
-      }
-
-      state.datasets.videos.unshift(normalizeVideo(data));
+      const result = await insertRecord("videos", payload);
+      state.datasets.videos.unshift(result.record);
       renderVideos();
       form.reset();
-      setMessage(message, "Video link published successfully.", "success");
+      setLiveBadge("videos", result.mode === "firebase", buildCollectionStatus("videos", result.mode));
+      setMessage(message, result.mode === "firebase" ? "Video link published to Firebase." : "Video link saved to the local fallback backend.", "success");
     } catch (error) {
       setMessage(message, error?.message || "Unable to publish video link.", "error");
     }
@@ -943,7 +1275,7 @@ async function initVideosPage() {
 
   const result = await fetchCollection("videos");
   state.datasets.videos = result.items;
-  setLiveBadge("videos", result.live, result.live ? "Live Supabase videos" : "Demo videos shown until the backend schema is applied");
+  setLiveBadge("videos", result.mode === "firebase" && !result.error, result.error || buildCollectionStatus("videos", result.mode));
   renderVideos();
 }
 
@@ -957,11 +1289,6 @@ async function initSigninPage() {
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
 
-    if (!supabaseClient) {
-      setMessage(message, "Supabase is unavailable in this browser session.", "error");
-      return;
-    }
-
     const formData = new FormData(form);
     const email = String(formData.get("email") || "").trim();
     const password = String(formData.get("password") || "").trim();
@@ -969,33 +1296,65 @@ async function initSigninPage() {
 
     try {
       if (intent === "signup") {
-        const { data, error } = await supabaseClient.auth.signUp({ email, password });
-        if (error) {
-          throw error;
+        if (firebaseAuth) {
+          try {
+            const credential = await firebaseAuth.createUserWithEmailAndPassword(email, password);
+            const user = credential.user;
+            if (user && !user.displayName) {
+              await user.updateProfile({
+                displayName: user.email?.split("@")[0] || "DevHub member"
+              });
+            }
+
+            clearLocalFallbackSession();
+            await ensureFirebaseProfile(firebaseAuth.currentUser || user, true);
+            state.session = createFirebaseSession(firebaseAuth.currentUser || user);
+            updateAuthUi();
+            setMessage(message, "Account created and connected to Firebase. Redirecting home...", "success");
+            setTimeout(() => {
+              window.location.href = "index.html";
+            }, 700);
+            return;
+          } catch (error) {
+            if (!shouldFallbackToLocal(error)) {
+              throw error;
+            }
+          }
         }
 
-        if (data.session) {
-          setMessage(message, "Account created and signed in. Redirecting home...", "success");
-          state.session = data.session;
+        const localSignup = await signUpLocal(email, password);
+        state.session = localSignup.session;
+        updateAuthUi();
+        setMessage(message, "Firebase is not ready yet, so a local account was created instead. Redirecting home...", "success");
+        setTimeout(() => {
+          window.location.href = "index.html";
+        }, 700);
+        return;
+      }
+
+      if (firebaseAuth) {
+        try {
+          const credential = await firebaseAuth.signInWithEmailAndPassword(email, password);
+          clearLocalFallbackSession();
+          await ensureFirebaseProfile(firebaseAuth.currentUser || credential.user, false);
+          state.session = createFirebaseSession(firebaseAuth.currentUser || credential.user);
           updateAuthUi();
+          setMessage(message, "Signed in with Firebase. Redirecting home...", "success");
           setTimeout(() => {
             window.location.href = "index.html";
           }, 700);
           return;
+        } catch (error) {
+          if (!shouldFallbackToLocal(error)) {
+            throw error;
+          }
         }
-
-        setMessage(message, "Account created. Check your email if confirmations are enabled.", "success");
-        return;
       }
 
-      const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
-      if (error) {
-        throw error;
-      }
-
-      state.session = data.session || null;
+      const localSignin = await signInLocal(email, password);
+      state.session = localSignin.session;
       updateAuthUi();
-      setMessage(message, "Signed in successfully. Redirecting home...", "success");
+      setMessage(message, "Signed in with the local fallback backend. Redirecting home...", "success");
       setTimeout(() => {
         window.location.href = "index.html";
       }, 700);
@@ -1017,10 +1376,19 @@ async function initApp() {
   initNav();
   bindGlobalActions();
 
-  if (supabaseClient) {
-    supabaseClient.auth.onAuthStateChange((_event, session) => {
-      state.session = session || null;
-      updateAuthUi();
+  if (firebaseAuth) {
+    firebaseAuth.onAuthStateChanged((user) => {
+      if (user) {
+        clearLocalFallbackSession();
+        state.session = createFirebaseSession(user);
+        updateAuthUi();
+        return;
+      }
+
+      if (state.session?.backend === "firebase") {
+        state.session = null;
+        updateAuthUi();
+      }
     });
   }
 
